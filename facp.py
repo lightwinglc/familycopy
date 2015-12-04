@@ -156,7 +156,7 @@ class FamilyCopy(object):
         splitfilepath, splitfilename = os.path.split(srcfile)
         dstfile = os.path.join(dstfilepath, splitfilename)
         # 复制文件
-        shutil.copyfile(srcfile, dstfile)
+        shutil.copy2(srcfile, dstfile)
         logger.debug("File %s copy to %s.", srcfile.encode("GBK"), dstfile.encode("GBK"))
 
         # 插入数据库记录
@@ -172,7 +172,7 @@ class FamilyCopy(object):
                 if self.filehandled % 100 == 0:
                     print "%d files was handled, %d files was ignored." % (self.filehandled, self.fileignored)
         print "All Done!"
-        logger.debug("%d files was handled, %d files was ignored.", self.filehandled, self.fileignored)
+        logger.info("%d files was handled, %d files was ignored.", self.filehandled, self.fileignored)
 
 
 def main():
