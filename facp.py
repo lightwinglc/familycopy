@@ -93,7 +93,7 @@ class FamilyCopy(object):
 
     # 计算文件hash加密，hash算法种类支持md5,sha1,sha256三种
     @staticmethod
-    def calc_file_hash(inputfile, hashtype="md5", chunksize=10240):
+    def calc_file_hash(inputfile, hashtype="md5", chunksize=102400):
         with open(inputfile, 'rb') as calcfile:
             hashobj = hashlib.md5()
             if hashtype == "md5":
@@ -134,14 +134,24 @@ class FamilyCopy(object):
             self.fileignored += 1
             return None
 
-        # 取文件创建时间
+        # 取文件创建时间，考虑到创建时间会随着文件复制被更改，因此使用修改时间和创建时间中较早的为实际创建时间
         srcfilectime = datetime.datetime.fromtimestamp(os.path.getctime(srcfile))
+        srcfilemtime = datetime.datetime.fromtimestamp(os.path.getmtime(srcfile))
+        if srcfilemtime <= srcfilectime:
+            srcfilerctime = srcfilemtime
+        else:
+            srcfilerctime = srcfilectime
         # 拼接目标文件目录
-        dstfilepath = os.path.join(self.dstdir, filetype, str(srcfilectime.year),
-                                   str(srcfilectime.month), str(srcfilectime.day))
+        dstfilepath = os.path.join(self.dstdir, str(srcfilerctime.year),
+                                   str(srcfilerctime.month), str(srcfilerctime.day),
+                                   filetype)
         if not os.path.isdir(dstfilepath):
-            os.makedirs(dstfilepath)
-            logger.info("Create directory %s succeed.", dstfilepath.encode("GBK"))
+            try:
+                os.makedirs(dstfilepath)
+            except OSError, msg:
+                logger.error("Create directory %s failed : %s.exit...", dstfilepath.encode("GBK"), str(msg))
+            else:
+                logger.info("Create directory %s succeed.", dstfilepath.encode("GBK"))
         # 拼接目标文件
         splitfilepath, splitfilename = os.path.split(srcfile)
         dstfile = os.path.join(dstfilepath, splitfilename)
@@ -215,6 +225,27 @@ def main():
     # 使用FamilyCopy类
     facp = FamilyCopy(srcdir, dstdir)
     facp.handle_src_dir()
+
+# 创建数据库和日志系统的文件夹
+dbdir = "db"
+if not os.path.isdir(os.path.join(os.curdir, dbdir)):
+    try:
+        os.makedirs(os.path.join(os.curdir, dbdir))
+    except OSError, msg:
+        print "Create directory %s failed : %s.exit..." % (os.path.join(os.curdir, dbdir), str(msg))
+        exit()
+    else:
+        print "Create directory %s succeed." % os.path.join(os.curdir, dbdir)
+
+logdir = "log"
+if not os.path.isdir(os.path.join(os.curdir, logdir)):
+    try:
+        os.makedirs(os.path.join(os.curdir, logdir))
+    except OSError, msg:
+        print "Create directory %s failed : %s.exit..." % (os.path.join(os.curdir, logdir), str(msg))
+        exit()
+    else:
+        print "Create directory %s succeed." % os.path.join(os.curdir, logdir)
 
 # 初始化日志系统
 # CRITICAL > ERROR > WARNING > INFO > DEBUG > NOTSET
