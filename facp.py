@@ -119,12 +119,12 @@ class FamilyCopy(object):
         # 根据后缀区分照片和视频，未知后缀不处理
         filetype = "picture"
         filepart1, filepart2 = os.path.splitext(srcfile)
-        if filepart2 in self.picset:
+        if filepart2.lower() in self.picset:
             pass
-        elif filepart2 in self.videoset:
+        elif filepart2.lower() in self.videoset:
             filetype = "video"
         else:
-            logger.warnning("file %s is illegal, ignore", srcfile.encode("GBK"))
+            logger.warning("file %s is illegal, ignore", srcfile.encode("GBK"))
             return None
 
         # 计算文件hash，过滤重复文件
@@ -234,8 +234,8 @@ dbdir = "db"
 if not os.path.isdir(os.path.join(os.curdir, dbdir)):
     try:
         os.makedirs(os.path.join(os.curdir, dbdir))
-    except OSError, msg:
-        print "Create directory %s failed : %s.exit..." % (os.path.join(os.curdir, dbdir), str(msg))
+    except OSError, osmsg:
+        print "Create directory %s failed : %s.exit..." % (os.path.join(os.curdir, dbdir), str(osmsg))
         exit()
     else:
         print "Create directory %s succeed." % os.path.join(os.curdir, dbdir)
@@ -244,8 +244,8 @@ logdir = "log"
 if not os.path.isdir(os.path.join(os.curdir, logdir)):
     try:
         os.makedirs(os.path.join(os.curdir, logdir))
-    except OSError, msg:
-        print "Create directory %s failed : %s.exit..." % (os.path.join(os.curdir, logdir), str(msg))
+    except OSError, osmsg:
+        print "Create directory %s failed : %s.exit..." % (os.path.join(os.curdir, logdir), str(osmsg))
         exit()
     else:
         print "Create directory %s succeed." % os.path.join(os.curdir, logdir)
