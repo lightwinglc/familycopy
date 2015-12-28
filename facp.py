@@ -42,7 +42,7 @@ class GlobalLog(object):
         return self.logger
 
 
-# 数据库操作类，暂时只支持sqlite
+# 数据库操作类，暂时只支持sqlite3
 class DBOperate(object):
     # 初始化数据库建表
     def __init__(self, dbfiledir, logger):
@@ -122,7 +122,7 @@ class DBOperate(object):
             exit()
 
 
-# 处理复制文件并改名分类的类
+# 文件复制并分目录存储
 class FamilyCopy(object):
     def __init__(self, srcdir, dstdir, logger):
         self.fadb = DBOperate("db", logger)
@@ -158,7 +158,6 @@ class FamilyCopy(object):
                     break
                 hashobj.update(chunk)
             hashvalue = hashobj.hexdigest()
-            # logger.debug("Calc file %s, type %s, hash value %s", inputfile.encode("GBK"), hashtype, hashvalue)
             return hashvalue
 
     # 处理源文件
@@ -175,9 +174,11 @@ class FamilyCopy(object):
             return None
 
         # 计算文件hash，过滤重复文件
-        hashvalue = self.calc_file_hash(srcfile, "sha256")
+        hashtype = "sha256"
+        hashvalue = self.calc_file_hash(srcfile, hashtype)
+        self.logger.debug("File %s, hash type %s, calc hash value %s", srcfile.encode("GBK"), hashtype, hashvalue)
         if self.fadb.check_hash_existed(hashvalue):
-            self.logger.warning("file %s already existed, ignore", srcfile.encode("GBK"))
+            self.logger.warning("File %s was already existed, ignore.", srcfile.encode("GBK"))
             self.fileignored += 1
             return None
 
@@ -218,7 +219,7 @@ class FamilyCopy(object):
                 self.handle_src_file(fullfilename)
                 if self.filehandled % 100 == 0:
                     print "%d files was handled, %d files was ignored." % (self.filehandled, self.fileignored)
-        print "All Done!"
+        print "All Done! %d files was handled, %d files was ignored." % (self.filehandled, self.fileignored)
         self.logger.info("%d files was handled, %d files was ignored.", self.filehandled, self.fileignored)
 
 
@@ -232,6 +233,7 @@ def main():
     parser.add_argument("dst", help="destination file directory")
     # parser.add_argument("-c", "--config", help="path of config file")
     args = parser.parse_args()
+    # 为便于windows环境下使用，源文件目录和目标文件目录脚本内部处理时作为unicode类型处理，需要打印时转为GBK编码的string类型处理
     srcdir = args.src.decode("GBK")
     dstdir = args.dst.decode("GBK")
 
