@@ -124,7 +124,7 @@ class DBOperate(object):
 
 # 文件复制并分目录存储
 class FamilyCopy(object):
-    def __init__(self, srcdir, dstdir, logger):
+    def __init__(self, srcdir, dstdir, fileoptype, logger):
         self.fadb = DBOperate("db", logger)
         self.filehandled = 0
         self.fileignored = 0
@@ -135,16 +135,16 @@ class FamilyCopy(object):
         # 保存成员变量
         self.srcdir = srcdir
         self.dstdir = dstdir
-
+        self.fileoptype = fileoptype
         self.logger = logger
 
     # 计算文件hash加密，hash算法种类支持md5,sha1,sha256三种
     @staticmethod
-    def calc_file_hash(inputfile, hashtype="md5", chunksize=102400):
+    def _calc_file_hash(inputfile, hashtype="md5", chunksize=102400):
         with open(inputfile, 'rb') as calcfile:
-            hashobj = hashlib.md5()
+            hashobj = None
             if hashtype == "md5":
-                pass
+                hashobj = hashlib.md5()
             elif hashtype == "sha1":
                 hashobj = hashlib.sha1()
             elif hashtype == "sha256":
@@ -163,20 +163,20 @@ class FamilyCopy(object):
     # 处理源文件
     def handle_src_file(self, srcfile):
         # 根据后缀区分照片和视频，未知后缀不处理
-        filetype = "picture"
         filepart1, filepart2 = os.path.splitext(srcfile)
         if filepart2.lower() in self.picset:
-            pass
+            filetype = "picture"
         elif filepart2.lower() in self.videoset:
             filetype = "video"
         else:
-            self.logger.warning("file %s is illegal, ignore", srcfile.encode("GBK"))
+            self.logger.warning("File %s is illegal, ignore", srcfile.encode("GBK"))
             return None
 
         # 计算文件hash，过滤重复文件
         hashtype = "sha256"
-        hashvalue = self.calc_file_hash(srcfile, hashtype)
-        self.logger.debug("File %s, hash type %s, calc hash value %s", srcfile.encode("GBK"), hashtype, hashvalue)
+        hashvalue = self._calc_file_hash(srcfile, hashtype)
+        self.logger.debug("File %s, hash type %s, calc hash value %s", srcfile.encode("GBK"),
+                          hashtype, hashvalue)
         if self.fadb.check_hash_existed(hashvalue):
             self.logger.warning("File %s was already existed, ignore.", srcfile.encode("GBK"))
             self.fileignored += 1
@@ -197,15 +197,27 @@ class FamilyCopy(object):
             try:
                 os.makedirs(dstfilepath)
             except OSError, msg:
-                self.logger.error("Create directory %s failed : %s.exit...", dstfilepath.encode("GBK"), str(msg))
+                self.logger.error("Create directory %s failed : %s.exit...",
+                                  dstfilepath.encode("GBK"), str(msg))
+                return None
             else:
                 self.logger.debug("Create directory %s succeed.", dstfilepath.encode("GBK"))
         # 拼接目标文件
         splitfilepath, splitfilename = os.path.split(srcfile)
         dstfile = os.path.join(dstfilepath, splitfilename)
-        # 复制文件
-        shutil.copy2(srcfile, dstfile)
-        self.logger.debug("File %s copy to %s.", srcfile.encode("GBK"), dstfile.encode("GBK"))
+        # 复制文件或者移动文件
+        try:
+            if self.fileoptype:
+                shutil.move(srcfile, dstfile)
+            else:
+                shutil.copy2(srcfile, dstfile)
+        except IOError, msg:
+            self.logger.error("File %s copy to %s failed:%s", srcfile.encode("GBK"),
+                              dstfile.encode("GBK"), str(msg))
+            return None
+        else:
+            self.logger.debug("File %s copy to %s succeed.", srcfile.encode("GBK"),
+                              dstfile.encode("GBK"))
 
         # 插入数据库记录
         self.fadb.add_hash(hashvalue, srcfile, dstfile)
@@ -218,24 +230,29 @@ class FamilyCopy(object):
                 fullfilename = os.path.join(parentdir, filename)
                 self.handle_src_file(fullfilename)
                 if self.filehandled % 100 == 0:
-                    print "%d files was handled, %d files was ignored." % (self.filehandled, self.fileignored)
-        print "All Done! %d files was handled, %d files was ignored." % (self.filehandled, self.fileignored)
-        self.logger.info("%d files was handled, %d files was ignored.", self.filehandled, self.fileignored)
+                    print "%d files was handled, %d files was ignored." % \
+                          (self.filehandled, self.fileignored)
+        print "All Done! %d files was handled, %d files was ignored." % \
+              (self.filehandled, self.fileignored)
+        self.logger.info("%d files was handled, %d files was ignored.", self.filehandled,
+                         self.fileignored)
 
 
 def main():
-    logger = GlobalLog("log").get_logger()
-
-    logger.debug("Program started.")
     # 命令行参数处理，接收两个定位参数：源文件目录和目标文件目录；一个可选参数：配置文件路径
     parser = argparse.ArgumentParser()
     parser.add_argument("src", help="source file directory")
     parser.add_argument("dst", help="destination file directory")
     # parser.add_argument("-c", "--config", help="path of config file")
+    parser.add_argument("-t", "--type", help="copy or move", action='store_true')
     args = parser.parse_args()
     # 为便于windows环境下使用，源文件目录和目标文件目录脚本内部处理时作为unicode类型处理，需要打印时转为GBK编码的string类型处理
     srcdir = args.src.decode("GBK")
     dstdir = args.dst.decode("GBK")
+    fileoptype = args.type
+
+    logger = GlobalLog("log").get_logger()
+    logger.debug("Program started.")
 
     # 校验参数
     # 源文件目录是否存在
@@ -258,7 +275,8 @@ def main():
             try:
                 os.makedirs(dstdir)
             except OSError, msg:
-                logger.error("Create directory %s failed : %s.exit...", dstdir.encode("GBK"), str(msg))
+                logger.error("Create directory %s failed : %s.exit...", dstdir.encode("GBK"),
+                             str(msg))
                 exit()
             else:
                 logger.debug("Create directory %s succeed.", dstdir.encode("GBK"))
@@ -277,7 +295,7 @@ def main():
     """
 
     # 使用FamilyCopy类
-    facp = FamilyCopy(srcdir, dstdir, logger)
+    facp = FamilyCopy(srcdir, dstdir, fileoptype, logger)
     facp.handle_src_dir()
 
 
